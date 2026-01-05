@@ -1,0 +1,128 @@
+# bigdata-pipeline-nyc-tlc
+
+Pipeline de Big Data para NYC TLC (yellow taxi) con ingesta, procesamiento distribuido, modelo predictivo y dashboard.
+
+## Arquitectura (texto)
+- Contenedores Docker: HDFS (namenode + datanode) y Spark (master + worker).
+- Ingesta local de Parquet a `data/raw/` y carga a HDFS en `/data/tlc/raw`.
+- ETL en Spark: limpieza, features y datos curated en `/data/tlc/curated`.
+- EDA y agregaciones en Spark: marts en `/data/tlc/marts`.
+- Modelo Spark MLlib: regresion de `trip_duration_min` y metricas en `/reports/metrics`.
+- Batch scoring en Spark: predicciones en `/data/tlc/predictions`.
+- Export local para Streamlit: `data/export/`.
+
+## Dataset
+- Fuente: NYC TLC Yellow Taxi.
+- Formato: Parquet.
+- Descarga parametrizada por anio y mes.
+
+## Requisitos
+- Docker y Docker Compose.
+- Streamlit en el host (para la vista local).
+
+## Ejecucion paso a paso
+
+1) Construir imagenes y levantar infraestructura
+```bash
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml up -d
+```
+
+2) Descargar datos (ejemplo 2024-01)
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && python3 scripts/00_download_tlc.py --year 2024 --month 01"
+```
+Para un trimestre completo (ejemplo Q1):
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && python3 scripts/00_download_tlc.py --year 2024 --quarter 1"
+```
+
+3) Subir a HDFS
+```bash
+docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --month 01"
+```
+Para un trimestre completo:
+```bash
+docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --quarter 1"
+```
+
+4) ETL con Spark
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --month 01"
+```
+Para un trimestre completo:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --quarter 1"
+```
+
+5) EDA y agregaciones
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --month 01"
+```
+Para un trimestre completo:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --quarter 1"
+```
+
+6) Entrenar modelo
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --month 01 --algoritmo gbt"
+```
+Para un trimestre completo:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --quarter 1 --algoritmo gbt"
+```
+
+7) Batch scoring
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --month 01"
+```
+Para un trimestre completo:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --quarter 1"
+```
+
+8) Exportar para dashboard
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --month 01"
+```
+Para un trimestre completo (guarda en subdirectorios year/month):
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --quarter 1"
+```
+
+9) Dashboard Streamlit (en el host)
+```bash
+streamlit run dashboards/streamlit_app.py
+```
+Si exportaste varios meses, usa el selector de periodo en el dashboard.
+
+## Puertos utiles
+- HDFS UI: http://localhost:9870
+- Spark Master UI: http://localhost:18080
+- Spark Worker UI: http://localhost:18081
+
+## Salidas esperadas
+- HDFS raw: `/data/tlc/raw/year=YYYY/month=MM`
+- HDFS curated: `/data/tlc/curated/year=YYYY/month=MM`
+- HDFS marts: `/data/tlc/marts/year=YYYY/month=MM`
+- HDFS models: `/models/tlc_trip_duration/`
+- HDFS metrics: `/reports/metrics/tlc_trip_duration/`
+- Local export: `data/export/`
+
+## Smoke test
+Usa un solo mes (ej. 2024-01) siguiendo los pasos anteriores y verifica que existan:
+- raw, curated, marts, modelo, metricas y export.
+Si necesitas reducir costo en una prueba rapida:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master local[*] scripts/02_spark_etl.py --year 2024 --month 01 --sample-frac 0.05 --max-rows 10000 --sin-outliers"
+```
+Para entrenamiento y scoring ligeros:
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master local[*] scripts/04_train_sparkml.py --year 2024 --month 01 --max-rows 10000"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master local[*] scripts/05_batch_scoring.py --year 2024 --month 01 --max-rows 10000"
+```
+
+## Notas
+- Si ejecutas scripts fuera del contenedor, exporta `PYTHONPATH=.`
+- El dashboard lee `data/export`; puedes cambiar la ruta con `TLC_EXPORT_DIR`.

@@ -1,0 +1,22 @@
+# Datos y salidas
+/data/
+
+# Volumenes HDFS
+/docker/hadoop_namenode/
+/docker/hadoop_datanode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Spark
+spark-warehouse/
+metastore_db/
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
