@@ -14,7 +14,7 @@ Pipeline de Big Data para NYC TLC (yellow taxi) con ingesta, procesamiento distr
 ## Dataset
 - Fuente: NYC TLC Yellow Taxi.
 - Formato: Parquet.
-- Descarga parametrizada por anio y mes.
+- Descarga parametrizada por anio y mes (o lista de meses para un anio completo).
 
 ## Requisitos
 - Docker y Docker Compose.
@@ -28,74 +28,74 @@ docker compose -f docker/docker-compose.yml build
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-2) Descargar datos (ejemplo 2024-01)
+2) Descargar datos (anio completo, ejemplo 2024)
+```bash
+docker exec -i spark-master bash -lc "cd /opt/project && python3 scripts/00_download_tlc.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12 --skip-missing"
+```
+Si quieres un solo mes para pruebas:
 ```bash
 docker exec -i spark-master bash -lc "cd /opt/project && python3 scripts/00_download_tlc.py --year 2024 --month 01"
-```
-Para un trimestre completo (ejemplo Q1):
-```bash
-docker exec -i spark-master bash -lc "cd /opt/project && python3 scripts/00_download_tlc.py --year 2024 --quarter 1"
 ```
 
 3) Subir a HDFS
 ```bash
-docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --month 01"
+docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12 --skip-missing"
 ```
-Para un trimestre completo:
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --quarter 1"
+docker exec -i namenode bash -lc "cd /opt/project && scripts/01_put_to_hdfs.sh --year 2024 --month 01"
 ```
 
 4) ETL con Spark
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --month 01"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12"
 ```
-Para un trimestre completo:
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --quarter 1"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/02_spark_etl.py --year 2024 --month 01"
 ```
 
 5) EDA y agregaciones
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --month 01"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12"
 ```
-Para un trimestre completo:
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --quarter 1"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/03_spark_eda_agg.py --year 2024 --month 01"
 ```
 
 6) Entrenar modelo
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --month 01 --algoritmo gbt"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12 --algoritmo gbt"
 ```
-Para un trimestre completo:
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --quarter 1 --algoritmo gbt"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/04_train_sparkml.py --year 2024 --month 01 --algoritmo gbt"
 ```
 
 7) Batch scoring
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --month 01"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12"
 ```
-Para un trimestre completo:
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --quarter 1"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/05_batch_scoring.py --year 2024 --month 01"
 ```
 
 8) Exportar para dashboard
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --month 01"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --months 01,02,03,04,05,06,07,08,09,10,11,12 --usar-subdir --exportar-metricas --exportar-errores"
 ```
-Para un trimestre completo (guarda en subdirectorios year/month):
+Si quieres un solo mes para pruebas:
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --quarter 1 --usar-subdir --exportar-metricas --exportar-errores"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --month 01"
 ```
 
 9) Dashboard Streamlit (en el host)
 ```bash
 streamlit run dashboards/streamlit_app.py
 ```
-Si exportaste varios meses, usa el selector de periodo en el dashboard.
+Si exportaste varios meses, usa el selector de periodo (incluye resumen anual).
 
 ## Puertos utiles
 - HDFS UI: http://localhost:9870
@@ -115,7 +115,7 @@ Si exportaste varios meses, usa el selector de periodo en el dashboard.
     `variabilidad_dia`, `metricas_modelo`, `errores_por_hora`.
 
 ## Smoke test
-Usa un solo mes (ej. 2024-01) siguiendo los pasos anteriores y verifica que existan:
+Usa un solo mes (ej. 2024-01) para pruebas rapidas y verifica que existan:
 - raw, curated, marts, modelo, metricas y export.
 Si necesitas reducir costo en una prueba rapida:
 ```bash
