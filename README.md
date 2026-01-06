@@ -6,7 +6,7 @@ Pipeline de Big Data para NYC TLC (yellow taxi) con ingesta, procesamiento distr
 - Contenedores Docker: HDFS (namenode + datanode) y Spark (master + worker).
 - Ingesta local de Parquet a `data/raw/` y carga a HDFS en `/data/tlc/raw`.
 - ETL en Spark: limpieza, features y datos curated en `/data/tlc/curated`.
-- EDA y agregaciones en Spark: marts en `/data/tlc/marts`.
+- EDA y agregaciones en Spark: marts en `/data/tlc/marts` (top zonas, pagos, distancia, variabilidad).
 - Modelo Spark MLlib: regresion de `trip_duration_min` y metricas en `/reports/metrics`.
 - Batch scoring en Spark: predicciones en `/data/tlc/predictions`.
 - Export local para Streamlit: `data/export/`.
@@ -88,7 +88,7 @@ docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit
 ```
 Para un trimestre completo (guarda en subdirectorios year/month):
 ```bash
-docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --quarter 1"
+docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit --master spark://spark-master:7077 scripts/06_export_for_dashboard.py --year 2024 --quarter 1 --usar-subdir --exportar-metricas --exportar-errores"
 ```
 
 9) Dashboard Streamlit (en el host)
@@ -109,6 +109,10 @@ Si exportaste varios meses, usa el selector de periodo en el dashboard.
 - HDFS models: `/models/tlc_trip_duration/`
 - HDFS metrics: `/reports/metrics/tlc_trip_duration/`
 - Local export: `data/export/`
+  - Subdirectorios: `data/export/year=YYYY/month=MM/`
+  - Incluye: `kpis`, `viajes_por_hora_dia`, `duracion_promedio_hora`, `tarifa_promedio_hora`,
+    `top_origen`, `top_destino`, `pagos`, `vendor`, `distancia_bins`, `variabilidad_hora`,
+    `variabilidad_dia`, `metricas_modelo`, `errores_por_hora`.
 
 ## Smoke test
 Usa un solo mes (ej. 2024-01) siguiendo los pasos anteriores y verifica que existan:
@@ -126,3 +130,5 @@ docker exec -i spark-master bash -lc "cd /opt/project && /spark/bin/spark-submit
 ## Notas
 - Si ejecutas scripts fuera del contenedor, exporta `PYTHONPATH=.`
 - El dashboard lee `data/export`; puedes cambiar la ruta con `TLC_EXPORT_DIR`.
+- El dashboard incluye tendencias mensuales, mapa de calor, comparativos semana/fin de semana,
+  top zonas, distribucion por pagos/vendor, variabilidad y errores por hora.
