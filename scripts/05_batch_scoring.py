@@ -3,6 +3,7 @@ import sys
 
 from pyspark.ml import PipelineModel
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException
 
 from src.spark_session import crear_spark
 from src.utils.fechas import resolver_meses
@@ -38,6 +39,11 @@ def main():
     parser.add_argument(
         "--max-rows", type=int, default=None, help="Limite de filas para scoring"
     )
+    parser.add_argument(
+        "--skip-missing",
+        action="store_true",
+        help="Omitir meses sin datos o modelo",
+    )
     parser.add_argument("--master", default=None, help="Master de Spark")
     parser.add_argument("--app-name", default="tlc-scoring", help="Nombre de la app")
     args = parser.parse_args()
@@ -62,14 +68,26 @@ def main():
         )
 
         logger.info("Leyendo datos curated desde %s", ruta_datos)
-        df = spark.read.parquet(ruta_datos)
+        try:
+            df = spark.read.parquet(ruta_datos)
+        except AnalysisException as error:
+            if args.skip_missing:
+                logger.warning("No se pudo leer %s: %s", ruta_datos, error)
+                continue
+            raise
         if args.sample_frac and 0 < args.sample_frac < 1:
             df = df.sample(fraction=args.sample_frac, seed=42)
         if args.max_rows and args.max_rows > 0:
             df = df.limit(args.max_rows)
 
         logger.info("Cargando modelo desde %s", ruta_modelo)
-        modelo = PipelineModel.load(ruta_modelo)
+        try:
+            modelo = PipelineModel.load(ruta_modelo)
+        except Exception as error:
+            if args.skip_missing:
+                logger.warning("No se pudo cargar modelo %s: %s", ruta_modelo, error)
+                continue
+            raise
 
         pred = modelo.transform(df)
 

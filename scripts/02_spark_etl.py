@@ -3,6 +3,7 @@ import os
 import sys
 
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException
 
 from src.etl.clean import (
     asegurar_columnas,
@@ -52,6 +53,11 @@ def main():
     parser.add_argument(
         "--sin-outliers", action="store_true", help="Omitir filtro de outliers"
     )
+    parser.add_argument(
+        "--skip-missing",
+        action="store_true",
+        help="Omitir meses que no existan en HDFS",
+    )
     args = parser.parse_args()
 
     logger = configurar_logging("etl_tlc")
@@ -71,7 +77,13 @@ def main():
         )
         logger.info("Leyendo datos desde %s", ruta_entrada)
 
-        df = spark.read.parquet(ruta_entrada)
+        try:
+            df = spark.read.parquet(ruta_entrada)
+        except AnalysisException as error:
+            if args.skip_missing:
+                logger.warning("No se pudo leer %s: %s", ruta_entrada, error)
+                continue
+            raise
         df = estandarizar_columnas(df, logger=logger)
 
         requeridas = ["pickup_datetime", "dropoff_datetime", "trip_distance", "fare_amount"]
@@ -87,6 +99,21 @@ def main():
             "ratecode_id": "desconocido",
         }
         df = asegurar_columnas(df, defaults, logger=logger)
+        columnas_base = [
+            "pickup_datetime",
+            "dropoff_datetime",
+            "trip_distance",
+            "fare_amount",
+            "total_amount",
+            "passenger_count",
+            "payment_type",
+            "pu_location",
+            "do_location",
+            "vendor_id",
+            "ratecode_id",
+        ]
+        columnas_presentes = [c for c in columnas_base if c in df.columns]
+        df = df.select(columnas_presentes)
 
         df = filtrar_invalidos(df)
         df = agregar_duracion(df)

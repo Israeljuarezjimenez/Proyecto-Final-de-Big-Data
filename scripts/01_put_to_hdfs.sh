@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mostrar_uso() {
-  echo "Uso: $0 --year YYYY --month MM | --months MM,MM,MM | --quarter Q [--local-dir data/raw] [--hdfs-raw-root /data/tlc/raw] [--hdfs-uri hdfs://namenode:8020]"
+  echo "Uso: $0 --year YYYY --month MM | --months MM,MM,MM | --quarter Q [--local-dir data/raw] [--hdfs-raw-root /data/tlc/raw] [--hdfs-uri hdfs://namenode:8020] [--skip-missing]"
 }
 
 YEAR=""
@@ -13,6 +13,7 @@ LOCAL_DIR="data/raw"
 HDFS_RAW_ROOT="/data/tlc/raw"
 HDFS_URI="hdfs://namenode:8020"
 HDFS_BIN=""
+SKIP_MISSING="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +44,10 @@ while [[ $# -gt 0 ]]; do
     --hdfs-uri)
       HDFS_URI="$2"
       shift 2
+      ;;
+    --skip-missing)
+      SKIP_MISSING="true"
+      shift 1
       ;;
     -h|--help)
       mostrar_uso
@@ -101,9 +106,14 @@ fi
 
 IFS=',' read -ra MESES_ARR <<< "$MONTHS"
 for MES_ITEM in "${MESES_ARR[@]}"; do
-  MES=$(printf "%02d" "$MES_ITEM")
+  MES_NUM=$((10#$MES_ITEM))
+  MES=$(printf "%02d" "$MES_NUM")
   ARCHIVO_LOCAL="${LOCAL_DIR}/yellow_tripdata_${YEAR}-${MES}.parquet"
   if [[ ! -f "$ARCHIVO_LOCAL" ]]; then
+    if [[ "$SKIP_MISSING" == "true" ]]; then
+      echo "No se encontro el archivo, se omite: $ARCHIVO_LOCAL"
+      continue
+    fi
     echo "No se encontro el archivo: $ARCHIVO_LOCAL"
     exit 1
   fi

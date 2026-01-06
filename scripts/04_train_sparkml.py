@@ -3,6 +3,7 @@ import sys
 from datetime import datetime, timezone
 
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException
 
 from src.ml.metrics import calcular_metricas_regresion
 from src.ml.pipeline import crear_pipeline
@@ -46,6 +47,11 @@ def main():
     parser.add_argument(
         "--max-rows", type=int, default=None, help="Limite de filas para entrenamiento"
     )
+    parser.add_argument(
+        "--skip-missing",
+        action="store_true",
+        help="Omitir meses que no existan en HDFS",
+    )
     args = parser.parse_args()
 
     logger = configurar_logging("train_tlc")
@@ -62,7 +68,13 @@ def main():
             args.hdfs_uri, f"{args.curated_root}/year={args.year}/month={mes}"
         )
         logger.info("Leyendo datos curated desde %s", ruta_entrada)
-        df = spark.read.parquet(ruta_entrada)
+        try:
+            df = spark.read.parquet(ruta_entrada)
+        except AnalysisException as error:
+            if args.skip_missing:
+                logger.warning("No se pudo leer %s: %s", ruta_entrada, error)
+                continue
+            raise
 
         df = df.filter(F.col("trip_duration_min") > 0)
         if args.sample_frac and 0 < args.sample_frac < 1:

@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 
 from src.utils.logging import configurar_logging
@@ -77,6 +78,11 @@ def main():
         default=None,
         help="Ruta del manifest.json (default: output-dir/manifest.json)",
     )
+    parser.add_argument(
+        "--skip-missing",
+        action="store_true",
+        help="Omitir meses que no existan en la fuente",
+    )
     parser.add_argument("--force", action="store_true", help="Forzar descarga")
     args = parser.parse_args()
 
@@ -98,7 +104,13 @@ def main():
         if os.path.exists(ruta_salida) and not args.force:
             logger.info("Archivo ya existe, usa --force para re-descargar: %s", ruta_salida)
         else:
-            descargar_archivo(url, ruta_salida, logger)
+            try:
+                descargar_archivo(url, ruta_salida, logger)
+            except (urllib.error.HTTPError, urllib.error.URLError) as error:
+                if args.skip_missing:
+                    logger.warning("No se pudo descargar %s: %s", url, error)
+                    continue
+                raise
 
         columnas = obtener_columnas_parquet(ruta_salida, logger)
         tamano = os.path.getsize(ruta_salida)
