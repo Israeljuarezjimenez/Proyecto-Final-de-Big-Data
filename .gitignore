@@ -1,5 +1,9 @@
 # Datos y salidas
-/data/
+/data/*
+!/data/export/
+!/data/export/**
+/data/export/**/_SUCCESS
+/data/export/**/*.crc
 
 # Volumenes HDFS
 /docker/hadoop_namenode/
